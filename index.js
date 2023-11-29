@@ -119,6 +119,11 @@ async function run() {
         }
         res.send({surveyor});
       })
+
+      app.get('/survey',async (req,res)=>{
+        const result = await surveyCollection.find().toArray();
+        res.send(result);
+      });
       
      app.post('/user',async(req,res) => {
 
@@ -132,7 +137,7 @@ async function run() {
         res.send(result);
      })
 
-     app.post('/survey',async(req,res)=>{
+     app.post('/survey',verifyToken,async(req,res)=>{
         const item = req.body;
         const surveyData = {
             ...item,
@@ -141,7 +146,7 @@ async function run() {
         console.log(surveyData);
         const result =await surveyCollection.insertOne(surveyData);
         res.send(result);
-     })
+     });
     
      app.patch('/user/admin/:id',verifyToken,verifyAdmin, async(req,res) =>{
         const id = req.params.id;
@@ -167,7 +172,12 @@ async function run() {
         res.send(result);
      })
 
-
+     app.delete('/survey/:id',verifyToken,async(req,res)=>{
+        const id = req.params.id;
+        const query ={_id: new ObjectId(id)}
+        const result = await surveyCollection.deleteOne(query);
+        res.send(result);
+     })
 
       app.delete ('/user/:id',verifyToken,verifyAdmin,async(req,res) =>{
          
