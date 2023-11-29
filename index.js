@@ -35,7 +35,7 @@ async function run() {
     app.post('/jwt',async(req,res)=>{
         const user = req.body;
         console.log('user for token', user);
-        const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn: '1h'});
+        const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn: '24h'});
         res.send({token});
         
       })
@@ -124,6 +124,13 @@ async function run() {
         const result = await surveyCollection.find().toArray();
         res.send(result);
       });
+
+      app.get('/survey/:id',async(req,res)=>{
+        const id = req.params.id;
+        const query ={_id:new ObjectId(id)}
+        const result = await surveyCollection.findOne(query);
+        res.send(result);
+      })
       
      app.post('/user',async(req,res) => {
 
@@ -169,6 +176,26 @@ async function run() {
             }
         }
         const result = await userCollection.updateOne(filter,updatedDoc);
+        res.send(result);
+     })
+
+     app.patch('/survey/:id',async(req,res)=>{
+        const item = req.body;
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id)}
+        const updatedDoc = {
+            $set:{
+                title:item.title,
+                category:item.category,
+                description:item.description,
+                image:item.image,
+                question1:item.question1,
+                question2:item.question2,
+                question3:item.question3,
+                deadline:item.deadline
+            }
+        }
+        const result = await surveyCollection.updateOne(filter,updatedDoc);
         res.send(result);
      })
 
