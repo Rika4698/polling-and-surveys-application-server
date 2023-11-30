@@ -178,11 +178,42 @@ async function run() {
         const result = await userCollection.updateOne(filter,updatedDoc);
         res.send(result);
      })
+     app.patch('/survey/:id', async(req,res) =>{
+        const item = req.body;
+        console.log(item);
+        const id = req.params.id;
+        const filter ={_id: new ObjectId(id)};
+        // console.log(filter);
+        const updatedDoc = {
+            $set:{
+                status:item.status,
+               adminFeedback:item.adminFeedback
+                
+            }
+        }
+        console.log(updatedDoc);
+        const result = await surveyCollection.updateOne(filter,updatedDoc);
+        console.log(result);
+        res.send(result);
+     })
+     app.patch('/survey/unpublished/:id',verifyToken,verifyAdmin, async(req,res) =>{
+        const id = req.body;
+        console.log(id);
+        // const filter ={_id: new ObjectId(id)};
+        // const updatedDoc = {
+        //     $set:{
+        //         status:"unpublished"
+        //     }
+        // }
+        // const result = await userCollection.updateOne(filter,updatedDoc);
+        // res.send(result);
+     })
 
-     app.patch('/survey/:id',async(req,res)=>{
+     app.put('/survey/:id',async(req,res)=>{
         const item = req.body;
         const id = req.params.id;
         const filter = { _id: new ObjectId(id)}
+        const options = { upsert: true };
         const updatedDoc = {
             $set:{
                 title:item.title,
@@ -192,10 +223,11 @@ async function run() {
                 question1:item.question1,
                 question2:item.question2,
                 question3:item.question3,
-                deadline:item.deadline
+                deadline:item.deadline,
+                timestamp:item.timestamp
             }
         }
-        const result = await surveyCollection.updateOne(filter,updatedDoc);
+        const result = await surveyCollection.updateOne(filter,updatedDoc,options);
         res.send(result);
      })
 
