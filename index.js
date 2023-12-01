@@ -4,6 +4,10 @@ const cors = require('cors');
 const moment = require('moment');
 const jwt = require('jsonwebtoken')
 require('dotenv').config();
+
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+
 const port = process.env.PORT||5000;
 
 //middleware
@@ -30,6 +34,7 @@ async function run() {
     // await client.connect();
     const userCollection = client.db("surveyDb").collection("users");
     const surveyCollection = client.db("surveyDb").collection("survey");
+    const paymentCollection = client.db("surveyDb").collection("payment");
     //jwt
 
     app.post('/jwt',async(req,res)=>{
@@ -83,7 +88,7 @@ async function run() {
 
 
 
-      app.get('/user', verifyToken,verifyAdmin, async (req, res) => {
+      app.get('/user',  async (req, res) => {
         // console.log(req.headers);
         const result = await userCollection.find().toArray();
         res.send(result);
@@ -119,6 +124,21 @@ async function run() {
         }
         res.send({surveyor});
       })
+      app.get('/user/pro/:email',verifyToken,async(req,res) => {
+        const email = req.params.email;
+        if(email!==req.decoded.email){
+            return res.status(403).send({message:'forbidden access'})
+
+        }
+        const query ={email:email};
+        const user = await userCollection.findOne(query);
+        let surveyor = false;
+        if(user){
+            surveyor = user?.role === 'pro-user';
+        }
+        res.send({surveyor});
+      })
+
 
       app.get('/survey',async (req,res)=>{
         const result = await surveyCollection.find().toArray();
@@ -178,6 +198,22 @@ async function run() {
         const result = await userCollection.updateOne(filter,updatedDoc);
         res.send(result);
      })
+
+
+     app.patch('/user/pro/:id',verifyToken, async(req,res) =>{
+        const id = req.params.id;
+        console.log(id);
+        const filter ={_id: new ObjectId(id)};
+        const updatedDoc = {
+            $set:{
+                role:'pro-user'
+            }
+        }
+        const result = await userCollection.updateOne(filter,updatedDoc);
+        res.send(result);
+     })
+
+
      app.patch('/survey/:id', async(req,res) =>{
         const item = req.body;
         console.log(item);
@@ -196,18 +232,18 @@ async function run() {
         console.log(result);
         res.send(result);
      })
-     app.patch('/survey/unpublished/:id',verifyToken,verifyAdmin, async(req,res) =>{
-        const id = req.body;
-        console.log(id);
-        // const filter ={_id: new ObjectId(id)};
-        // const updatedDoc = {
-        //     $set:{
-        //         status:"unpublished"
-        //     }
-        // }
-        // const result = await userCollection.updateOne(filter,updatedDoc);
-        // res.send(result);
-     })
+    //  app.patch('/survey/unpublished/:id',verifyToken,verifyAdmin, async(req,res) =>{
+    //     const id = req.body;
+    //     console.log(id);
+    //     // const filter ={_id: new ObjectId(id)};
+    //     // const updatedDoc = {
+    //     //     $set:{
+    //     //         status:"unpublished"
+    //     //     }
+    //     // }
+    //     // const result = await userCollection.updateOne(filter,updatedDoc);
+    //     // res.send(result);
+    //  })
 
      app.put('/survey/:id',async(req,res)=>{
         const item = req.body;
@@ -224,7 +260,7 @@ async function run() {
                 question2:item.question2,
                 question3:item.question3,
                 deadline:item.deadline,
-                timestamp:item.timestamp
+                timestamp: moment().format('MMMM Do YYYY, h:mm:ss a')
             }
         }
         const result = await surveyCollection.updateOne(filter,updatedDoc,options);
@@ -246,7 +282,42 @@ async function run() {
         res.send(result);
       })
 
+      app.get('/payment',  async (req, res) => {
+        // const query = { email: req.params.email }
+        // console.log('email',query);
+        // if (req.params.email !== req.decoded.email) {
+        //   return res.status(403).send({ message: 'forbidden access' });
+        // }
+        const result = await paymentCollection.find().toArray();
+        res.send(result);
+      })
       
+      app.post("/create-payment-intent", async (req, res) => {
+        const { price } = req.body;
+        const amount = parseInt(price * 100);
+        // console.log(amount,'amount inside');
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "usd",
+          payment_method_types: ['card']
+        });
+      
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
+      });
+      
+      app.post('/payment',async(req,res)=>{
+        const payment = req.body;
+        const query = { email: payment.email }
+        const existingUser = await paymentCollection.findOne(query);
+        if (existingUser) {
+          return res.send({ message: 'user already exists', insertedId: null })
+        }
+        const paymentResult = await paymentCollection.insertOne(payment);
+        console.log('payment info', payment);
+        res.send(paymentResult);
+      })
 
 
 
