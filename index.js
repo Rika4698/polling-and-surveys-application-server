@@ -88,7 +88,7 @@ async function run() {
 
 
 
-      app.get('/user',  async (req, res) => {
+      app.get('/user',verifyToken,verifyAdmin, async (req, res) => {
         // console.log(req.headers);
         const result = await userCollection.find().toArray();
         res.send(result);
@@ -132,11 +132,11 @@ async function run() {
         }
         const query ={email:email};
         const user = await userCollection.findOne(query);
-        let surveyor = false;
+        let proUser = false;
         if(user){
-            surveyor = user?.role === 'pro-user';
+            proUser = user?.role === 'pro-user';
         }
-        res.send({surveyor});
+        res.send({proUser});
       })
 
 
@@ -145,11 +145,77 @@ async function run() {
         res.send(result);
       });
 
-      app.get('/survey/:id',async(req,res)=>{
+      app.get('/survey/mostVote', async(req, res)=>{
+        const result = await surveyCollection.find({status: 'published'})
+        .project({title: 1, category:1, description: 1, totalVote: 1,image:1,liked:1,disliked:1, comments:1,})
+        .sort({totalVote: -1})
+        .limit(6)
+        .toArray()
+        res.send(result)
+      })
+  
+      
+  //     app.get('/survey/title/:title', async (req, res) => {
+  //   const { title } = req.params;
+  //   console.log(title);
+  //   try {
+  //     const survey = await surveyCollection.find({ title }).toArray();
+  //     res.json(survey);
+  //   } catch (error) {
+  //     res.status(500).json({ message: 'Error fetching surveys by title' });
+  //   }
+  // });
+
+  // // Endpoint for filtering by category
+  // app.get('/survey/category/:category', async (req, res) => {
+  //   const { category } = req.params;
+  //   try {
+  //     const survey = await surveyCollection.find({ category }).toArray();
+  //     res.json(survey);
+  //   } catch (error) {
+  //     res.status(500).json({ message: 'Error fetching surveys by category' });
+  //   }
+  // });
+
+  // Endpoint for sorting by totalVote in descending order
+  app.get('/survey/sortByTotalVote', async (req, res) => {
+    
+      const surveys = await surveyCollection.find().sort({ totalVote: -1 }).toArray();
+      res.json(surveys);
+   
+  });
+
+
+
+      app.get('/survey/:id',  async(req,res)=>{
         const id = req.params.id;
+        const email = req.query.email;
+        console.log(email);
         const query ={_id:new ObjectId(id)}
         const result = await surveyCollection.findOne(query);
-        res.send(result);
+        let isUserVoted = false
+      if(result){
+        if(result.voted){
+          const isvoted = result.voted.find(user =>user.email == email)
+          console.log(result.voted);
+          if(isvoted){
+            isUserVoted =true
+          }
+        }
+      }
+      // console.log(isUserVoted);
+      res.send({isUserVoted, result})
+      // res.send(result);
+      })
+
+      app.get('/survey/update/:id',   async(req, res) => {
+        const id = req.params.id
+       
+     
+        const query = {_id: new ObjectId(id)}
+        const result = await surveyCollection.findOne(query) 
+        res.send(result)
+        console.log(result)
       })
       
      app.post('/user',async(req,res) => {
@@ -175,7 +241,7 @@ async function run() {
         res.send(result);
      });
     
-     app.patch('/user/admin/:id',verifyToken,verifyAdmin, async(req,res) =>{
+     app.patch('/user/admin/:id',verifyToken, async(req,res) =>{
         const id = req.params.id;
         const filter ={_id: new ObjectId(id)};
         const updatedDoc = {
@@ -200,18 +266,88 @@ async function run() {
      })
 
 
-     app.patch('/user/pro/:id',verifyToken, async(req,res) =>{
-        const id = req.params.id;
-        console.log(id);
-        const filter ={_id: new ObjectId(id)};
+     app.patch('/user/pro/:email',verifyToken, async(req,res) =>{
+      const email = req.params.email;
+        
+        const query = { email: email }
         const updatedDoc = {
             $set:{
                 role:'pro-user'
             }
         }
-        const result = await userCollection.updateOne(filter,updatedDoc);
+        const result = await userCollection.updateOne(query,updatedDoc);
         res.send(result);
      })
+
+      app.put('/updateSurvey/:id', verifyToken, async(req, res)=>{
+      const id = req.params.id
+      const {email, votedIn, liked, disliked, yesVoted, noVoted,totalVote,voteTime} = req.body
+      // console.log(req.body)
+      const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
+      // console.log(survey.voted);
+      let updatedQuery;
+      if(survey){
+        
+        if(survey.voted){
+          updatedQuery= {
+            $push: {voted: {email, votedIn,voteTime}},
+            $inc: {liked: liked || 0, totalVote: totalVote, disliked: disliked || 0, yesVoted: yesVoted || 0, noVoted:noVoted || 0}
+          } 
+        }else{
+          updatedQuery={
+            $set: {voted: [{email, votedIn,voteTime}]},
+            $inc: {liked: liked || 0, totalVote: totalVote, disliked: disliked || 0, yesVoted: yesVoted || 0, noVoted:noVoted || 0}
+          }
+        }
+        
+      }
+      const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
+      console.log(updatedQuery);
+      res.send(result)
+
+
+    })
+
+    app.put('/surveyReportUpdate/:id', verifyToken, async(req, res)=>{
+      const id = req.params.id
+      const report = req.query.report
+      const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
+      let updatedQuery 
+      if (survey) {
+        if(survey.reports){
+          updatedQuery = {
+            $push: {reports: report}
+          }
+        }else{
+          updatedQuery = {
+            $set: {reports: [report]}
+          }
+        }
+      }
+      const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
+      res.send(result)
+    })
+
+    app.put('/surveyCommentUpdate/:id', verifyToken, async(req, res)=>{
+      const id = req.params.id
+ const comment = req.query.comment
+ const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
+ let updatedQuery 
+ if (survey) {
+   if(survey.reports){
+     updatedQuery = {
+       $push: {comments: comment}
+     }
+   }else{
+     updatedQuery = {
+       $set: {comments: [comment]}
+     }
+   }
+ }
+ const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
+ res.send(result)
+})
+
 
 
      app.patch('/survey/:id', async(req,res) =>{
@@ -245,7 +381,7 @@ async function run() {
     //     // res.send(result);
     //  })
 
-     app.put('/survey/:id',async(req,res)=>{
+     app.put('/survey/update/:id',verifyToken,async(req,res)=>{
         const item = req.body;
         const id = req.params.id;
         const filter = { _id: new ObjectId(id)}
@@ -253,6 +389,7 @@ async function run() {
         const updatedDoc = {
             $set:{
                 title:item.title,
+                totalVote:item.totalVote,
                 category:item.category,
                 description:item.description,
                 image:item.image,
@@ -282,7 +419,7 @@ async function run() {
         res.send(result);
       })
 
-      app.get('/payment',  async (req, res) => {
+      app.get('/payment', verifyToken,verifyAdmin, async (req, res) => {
         // const query = { email: req.params.email }
         // console.log('email',query);
         // if (req.params.email !== req.decoded.email) {
