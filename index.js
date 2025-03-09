@@ -218,7 +218,9 @@ async function run() {
         console.log(result)
       })
       
-     app.post('/user',async(req,res) => {
+    
+    
+      app.post('/user',async(req,res) => {
 
         const user = req.body;
         const query = { email: user.email }
@@ -253,6 +255,7 @@ async function run() {
         res.send(result);
      })
 
+    
      app.patch('/user/surveyor/:id',verifyToken,verifyAdmin, async(req,res) =>{
         const id = req.params.id;
         const filter ={_id: new ObjectId(id)};
@@ -264,6 +267,7 @@ async function run() {
         const result = await userCollection.updateOne(filter,updatedDoc);
         res.send(result);
      })
+
 
 
      app.patch('/user/pro/:email',verifyToken, async(req,res) =>{
@@ -279,95 +283,321 @@ async function run() {
         res.send(result);
      })
 
-      app.put('/updateSurvey/:id', verifyToken, async(req, res)=>{
-      const id = req.params.id
-      const {email, votedIn, liked, disliked, yesVoted, noVoted,totalVote,voteTime} = req.body
-      // console.log(req.body)
-      const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
-      // console.log(survey.voted);
+   
+   
+    //  app.put('/updateSurvey/:id', async(req, res)=>{
+    //   const id = req.params.id
+    //   const {email, votedIn, liked, disliked, yesVoted, noVoted,totalVote,voteTime} = req.body
+    //   // console.log(req.body)
+    //   const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
+    //   // console.log(survey.voted);
+    //   let updatedQuery;
+    //   if(survey){
+        
+    //     if(survey.voted){
+    //       updatedQuery= {
+    //         $push: {voted: {email, votedIn,voteTime}},
+    //         $inc: {liked: liked || 0, totalVote: totalVote, disliked: disliked || 0, yesVoted: yesVoted || 0, noVoted:noVoted || 0}
+    //       } 
+    //     }else{
+    //       updatedQuery={
+    //         $set: {voted: [{email, votedIn,voteTime}]},
+    //         $inc: {liked: liked || 0, totalVote: totalVote, disliked: disliked || 0, yesVoted: yesVoted || 0, noVoted:noVoted || 0}
+    //       }
+    //     }
+        
+    //   }
+    //   const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
+    //   console.log(updatedQuery);
+    //   res.send(result)
+
+
+    // })
+
+    app.put('/updateSurvey/:id', async (req, res) => {
+      const id = req.params.id;
+      const {
+        email,
+        votedIn,
+        liked,
+        disliked,
+        totalVote,
+        voteCounts,
+        voteTime,
+        question1_yes,
+        question1_no,
+        question2_yes,
+        question2_no,
+        question3_yes,
+        question3_no,
+      } = req.body;
+    
+      // Find the survey by its ID
+      const survey = await surveyCollection.findOne({ _id: new ObjectId(id) });
+    
       let updatedQuery;
-      if(survey){
-        
-        if(survey.voted){
-          updatedQuery= {
-            $push: {voted: {email, votedIn,voteTime}},
-            $inc: {liked: liked || 0, totalVote: totalVote, disliked: disliked || 0, yesVoted: yesVoted || 0, noVoted:noVoted || 0}
-          } 
-        }else{
-          updatedQuery={
-            $set: {voted: [{email, votedIn,voteTime}]},
-            $inc: {liked: liked || 0, totalVote: totalVote, disliked: disliked || 0, yesVoted: yesVoted || 0, noVoted:noVoted || 0}
-          }
-        }
-        
-      }
-      const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
-      console.log(updatedQuery);
-      res.send(result)
-
-
-    })
-
-    app.put('/surveyReportUpdate/:id', verifyToken, async(req, res)=>{
-      const id = req.params.id
-      const report = req.query.report
-      const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
-      let updatedQuery 
       if (survey) {
-        if(survey.reports){
+        if (survey.voted) {
+          // If the survey has been voted before, push new vote data and update counts
           updatedQuery = {
-            $push: {reports: report}
-          }
-        }else{
+            $push: { voted: { email, votedIn, voteTime, voteCounts } },
+            $inc: {
+              liked: liked || 0,
+              totalVote: totalVote,
+              disliked: disliked || 0,
+              question1_yes:question1_yes || 0,
+        question1_no:question1_no || 0,
+        question2_yes:question2_yes || 0,
+        question2_no:question2_no || 0,
+        question3_yes:question3_yes || 0,
+        question3_no:question3_no || 0,
+              
+            },
+            
+          };
+        } else {
+          // If the survey has not been voted before, set initial vote data
           updatedQuery = {
-            $set: {reports: [report]}
-          }
+            $set: {
+              voted: [{ email, votedIn, voteTime, voteCounts }],
+              
+            },
+            $inc: {
+              liked: liked || 0,
+              totalVote: totalVote,
+              disliked: disliked || 0,
+              question1_yes:question1_yes || 0,
+              question1_no:question1_no || 0,
+              question2_yes:question2_yes || 0,
+              question2_no:question2_no || 0,
+              question3_yes:question3_yes || 0,
+              question3_no:question3_no || 0,
+            },
+          };
         }
       }
-      const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
-      res.send(result)
-    })
-
-    app.put('/surveyCommentUpdate/:id', verifyToken, async(req, res)=>{
-      const id = req.params.id
- const comment = req.query.comment
- const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
- let updatedQuery 
- if (survey) {
-   if(survey.reports){
-     updatedQuery = {
-       $push: {comments: comment}
-     }
-   }else{
-     updatedQuery = {
-       $set: {comments: [comment]}
-     }
-   }
- }
- const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
- res.send(result)
-})
+    
+      // Update the survey document in the database
+      const result = await surveyCollection.updateOne({ _id: new ObjectId(id) }, updatedQuery);
+      console.log(updatedQuery);
+      res.send(result);
+    });
 
 
 
-     app.patch('/survey/:id', async(req,res) =>{
-        const item = req.body;
-        console.log(item);
-        const id = req.params.id;
-        const filter ={_id: new ObjectId(id)};
-        // console.log(filter);
-        const updatedDoc = {
-            $set:{
-                status:item.status,
-               adminFeedback:item.adminFeedback
+
+    // app.put('/surveyReportUpdate/:id',  async(req, res)=>{
+    //   const id = req.params.id
+    //   const report = req.query.report
+    //   const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
+    //   let updatedQuery 
+    //   if (survey) {
+    //     if(survey.reports){
+    //       updatedQuery = {
+    //         $push: {reports: report}
+    //       }
+    //     }else{
+    //       updatedQuery = {
+    //         $set: {reports: [report]}
+    //       }
+    //     }
+    //   }
+    //   const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
+    //   res.send(result)
+    // })
+
+
+    app.post('/surveyReport/:id', async (req, res) => {
+      try {
+          const id = req.params.id;
+          const reportData = req.body;
+          
+          const report = {
+              _id: new ObjectId(),
+              ...reportData,
+              timestamp: new Date().toISOString()
+          };
+    
+          const result = await surveyCollection.updateOne(
+              { _id: new ObjectId(id) },
+              { $push: { reports: report } }
+          );
+    
+          res.json({ 
+              success: true, 
+              message: 'Report added successfully',
+              result 
+          });
+      } catch (error) {
+          console.error('Error adding report:', error);
+          res.status(500).json({ 
+              success: false, 
+              message: 'Error adding report',
+              error: error.message 
+          });
+      }
+    });
+    
+
+//     app.put('/surveyCommentUpdate/:id',  async(req, res)=>{
+//       const id = req.params.id
+//  const comment = req.query.comment
+ 
+//  const survey = await surveyCollection.findOne({_id: new ObjectId(id)})
+//  console.log(survey.reports);
+//  let updatedQuery 
+//  if (survey) {
+//    if(survey.reports){
+//      updatedQuery = {
+//        $push: {comments: comment}
+//      }
+//    }else{
+//      updatedQuery = {
+//        $set: {comments: [comment]}
+//      }
+//    }
+//  }
+//  const result = await surveyCollection.updateOne({_id: new ObjectId(id)}, updatedQuery)
+//  res.send(result)
+// })
+
+
+app.get('/surveyComments/:id', async (req, res) => {
+  try {
+      const id = req.params.id;
+      const survey = await surveyCollection.findOne(
+          { _id: new ObjectId(id) },
+          { projection: { comments: 1 } }
+      );
+      
+      res.json(survey?.comments || []);
+  } catch (error) {
+      console.error('Error fetching comments:', error);
+      res.status(500).json({ 
+          success: false, 
+          message: 'Error fetching comments',
+          error: error.message 
+      });
+  }
+});
+
+app.post('/addComment/:id', async (req, res) => {
+  try {
+      const id = req.params.id;
+      const commentData = req.body;
+      
+      const comment = {
+          _id: new ObjectId(),
+          ...commentData,
+          timestamp: new Date().toISOString()
+      };
+
+      const result = await surveyCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $push: { comments: comment } }
+      );
+
+      res.json({ 
+          success: true, 
+          message: 'Comment added successfully',
+          result 
+      });
+  } catch (error) {
+      console.error('Error adding comment:', error);
+      res.status(500).json({ 
+          success: false, 
+          message: 'Error adding comment',
+          error: error.message 
+      });
+  }
+});
+
+app.delete('/deleteComment/:id/:commentId', async (req, res) => {
+  try {
+    const id = req.params.id;
+      const {  commentId } = req.params;
+
+      const result = await surveyCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { 
+              $pull: { 
+                  comments: { 
+                      _id: new ObjectId(commentId) 
+                  } 
+              } 
+          }
+      );
+
+      if (result.modifiedCount === 0) {
+          return res.status(404).json({ 
+              success: false, 
+              message: 'Comment not found' 
+          });
+      }
+
+      res.json({ 
+          success: true, 
+          message: 'Comment deleted successfully' 
+      });
+  } catch (error) {
+      console.error('Error deleting comment:', error);
+      res.status(500).json({ 
+          success: false, 
+          message: 'Error deleting comment',
+          error: error.message 
+      });
+  }
+});
+
+
+
+
+
+
+
+
+
+    //  app.patch('/survey/:id', async(req,res) =>{
+    //     const item = req.body;
+    //     console.log(item);
+    //     const id = req.params.id;
+    //     const filter ={_id: new ObjectId(id)};
+       
+    //     const updatedDoc = {
+    //         $set:{
+    //             status:item.status,
+    //            adminFeedback:item.adminFeedback
                 
-            }
-        }
-        console.log(updatedDoc);
-        const result = await surveyCollection.updateOne(filter,updatedDoc);
-        console.log(result);
-        res.send(result);
-     })
+    //         }
+    //     }
+    //     console.log(updatedDoc);
+    //     const result = await surveyCollection.updateOne(filter,updatedDoc);
+    //     console.log(result);
+    //     res.send(result);
+    //  })
+
+    app.patch('/survey/:id', async (req, res) => {
+      const item = req.body;
+      console.log(item);
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+  
+      const updatedDoc = {
+          $set: {
+              status: item.status,  // "published" or "unpublished"
+              adminFeedback: item.adminFeedback,
+              adminName: item.adminName,
+              adminEmail: item.adminEmail,
+              publishedAt: item.status === "published" ? moment().format('MMMM Do YYYY, h:mm:ss a') : null,
+              updatedAt: moment().format('MMMM Do YYYY, h:mm:ss a') // Always update last modified time
+          }
+      };
+  
+      console.log(updatedDoc);
+      const result = await surveyCollection.updateOne(filter, updatedDoc);
+      console.log(result);
+      res.send(result);
+  });
     //  app.patch('/survey/unpublished/:id',verifyToken,verifyAdmin, async(req,res) =>{
     //     const id = req.body;
     //     console.log(id);
@@ -381,6 +611,7 @@ async function run() {
     //     // res.send(result);
     //  })
 
+
      app.put('/survey/update/:id',verifyToken,async(req,res)=>{
         const item = req.body;
         const id = req.params.id;
@@ -389,7 +620,7 @@ async function run() {
         const updatedDoc = {
             $set:{
                 title:item.title,
-                totalVote:item.totalVote,
+                // totalVote:item.totalVote,
                 category:item.category,
                 description:item.description,
                 image:item.image,
@@ -397,6 +628,7 @@ async function run() {
                 question2:item.question2,
                 question3:item.question3,
                 deadline:item.deadline,
+               
                 timestamp: moment().format('MMMM Do YYYY, h:mm:ss a')
             }
         }
